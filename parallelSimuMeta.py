@@ -13,6 +13,7 @@ import subprocess
 from shutil import copyfile,rmtree
 import pandas as pd
 import os.path
+from bs4 import BeautifulSoup
 
 ######################################################
 #run models and get the results in parallel
@@ -128,15 +129,20 @@ def runModel(climate,eplus_path,weather_file,eplus_file,param_value,output_file,
             data.append(param_value[j])
         
         #get output(site EUI and source EUI)
-        dfs = pd.read_html('./results/'+climate+output_file+eplus_file.split('.')[0]+'/eplustbl.htm')
-        df1 = dfs[0]
-        df2 = dfs[2]
-        site_energy = float(df1.loc[1][1])
-        source_energy = float(df1.loc[3][1])
-        area = float(df2.loc[1][1])
-        data.append(str(0.088055066*1000*site_energy/area)) #get site EUI (KBtu/ft2)
-        data.append(str(0.088055066*1000*source_energy/area)) #get source EUI (KBtu/ft2)
-   
+        path='./results/'+climate+output_file+eplus_file.split('.')[0]+'/eplustbl.htm'
+        with open(path) as fp:
+            soup = BeautifulSoup(fp)
+
+        energy_table = soup.find_all('table')[0]
+        rows = energy_table.find_all('tr')
+        total_site_energy_data = rows[1]
+        total_source_energy_data = rows[3]
+        total_site_energy_per_total_building_area_html = total_site_energy_data.find_all('td')[2]
+        total_source_energy_per_total_building_area_html = total_source_energy_data.find_all('td')[2]
+        total_site_energy_per_total_building_area = float(total_site_energy_per_total_building_area_html.text)*0.088055066
+        total_source_energy_per_total_building_area= float(total_source_energy_per_total_building_area_html.text)*0.088055066
+        data.append(total_site_energy_per_total_building_area)
+        data.append(total_source_energy_per_total_building_area)
     
         #record the data in the './results/energy_data.csv'
         with open('./results/energy_data.csv', 'ab') as csvfile:
